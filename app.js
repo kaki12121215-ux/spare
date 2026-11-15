@@ -1,7 +1,7 @@
 /* Spare · versión 1.0 */
 (() => {
 'use strict';
-const VERSION = '1.0';
+const VERSION = '1.1';
 
 /* ---------- utilidades de fecha ---------- */
 const DAY = 86400000;
@@ -45,6 +45,8 @@ let THEME = 'light';
 function applyTheme() {
   THEME = S.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : S.theme;
   document.documentElement.dataset.theme = THEME;
+  const bg = THEME === 'dark' ? '#0B0D14' : '#F7F7F5';
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.removeAttribute('media'); m.setAttribute('content', bg); });
 }
 mq.addEventListener && mq.addEventListener('change', () => { applyTheme(); rebuild(); });
 const PAL = {
@@ -81,7 +83,7 @@ function measure() {
 /* ---------- vistas ---------- */
 const VIEWS = ['vida', 'ano', 'mes', 'semana', 'dia'];
 const NAVN = { vida: 'Vida', ano: 'Año', mes: 'Mes', semana: 'Semana', dia: 'Día' };
-const UNITS = { vida: ['Semanas', 'Meses', 'Años'], ano: ['Días', 'Semanas', 'Meses', '%'], mes: ['Días', 'Semanas'], semana: ['Días', 'Horas'], dia: ['Horas', 'Cuartos'], cd: ['Días', 'Semanas'] };
+const UNITS = { vida: ['Días', 'Semanas', 'Meses', 'Años'], ano: ['Días', 'Semanas', 'Meses', '%'], mes: ['Días', 'Semanas'], semana: ['Días', 'Horas'], dia: ['Horas', 'Cuartos'], cd: ['Días', 'Semanas'] };
 const WD = ws => ws === 1 ? ['L', 'M', 'X', 'J', 'V', 'S', 'D'] : ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 
 function courseCd(now) {
@@ -100,7 +102,7 @@ function getCd(id, now) { return allCds(now).find(c => c.id === id); }
 function layout(N, cols, top, bottom, ratio, lead = 0, dims) {
   const gw = dims.W - 56, rows = Math.ceil((N + lead) / cols);
   const cell = Math.min(gw / cols, (bottom - top) / rows);
-  const s = Math.max(2, cell * ratio);
+  const s = Math.max(.8, cell * ratio);
   const xp = cols > 1 ? (gw - s) / (cols - 1) : 0;
   const out = [];
   for (let i = 0; i < N; i++) { const k = i + lead; out.push({ x: 28 + s / 2 + (cols > 1 ? (k % cols) * xp : (gw - s) / 2), y: top + s / 2 + Math.floor(k / cols) * cell, r: s / 2 }); }
@@ -108,7 +110,7 @@ function layout(N, cols, top, bottom, ratio, lead = 0, dims) {
 }
 function autoCols(N, top, bottom, dims) {
   let best = 1, bc = 0; const gw = dims.W - 56;
-  for (let c = 1; c <= 60; c++) { const cell = Math.min(gw / c, (bottom - top) / Math.ceil(N / c)); if (cell >= bc - 0.01) { bc = cell; best = c; } }
+  for (let c = 1; c <= 400; c++) { const cell = Math.min(gw / c, (bottom - top) / Math.ceil(N / c)); if (cell >= bc - 0.01) { bc = cell; best = c; } }
   return best;
 }
 
@@ -129,7 +131,15 @@ function build(key, unit, now, dims) {
     pg.units = UNITS.vida;
     const b = parseISO(S.birth) || new Date(1998, 0, 1);
     pg.date = 'Si llegas a los ' + S.life;
-    if (unit === 'Meses') {
+    if (unit === 'Días') {
+      const end = new Date(b.getFullYear() + S.life, b.getMonth(), b.getDate());
+      const tot = daysBetween(b, end), lived = cl(daysBetween(b, today), 0, tot);
+      const cols = autoCols(tot, top, bottom, dims);
+      set(tot, lived, cols, .42);
+      const left = Math.max(0, tot - lived - 1); pg.num = miles(left); pg.unitText = pl(left, 'día', 'días') + ' por delante';
+      pg.dayLevel = true;
+      pg.dateOf = i => { const s = addDays(b, i); return { s, e: addDays(s, 1), t: fechaLarga(s) + ' de ' + s.getFullYear(), age: Math.floor(daysBetween(b, s) / 365.25) }; };
+    } else if (unit === 'Meses') {
       const tot = S.life * 12; let lived = (today.getFullYear() - b.getFullYear()) * 12 + today.getMonth() - b.getMonth() - (today.getDate() < b.getDate() ? 1 : 0);
       lived = cl(lived, 0, tot); set(tot, lived, 24, .6);
       const left = Math.max(0, tot - lived - 1); pg.num = miles(left); pg.unitText = pl(left, 'mes', 'meses') + ' por delante';
@@ -259,6 +269,7 @@ const F = (w, s) => w + ' ' + s + 'px SpText, -apple-system, system-ui';
 let NOW = 0;
 const breath = () => .5 - .5 * Math.cos(NOW / 1000 * 2 * Math.PI / 3.2);
 function glowDot(ctx, x, y, r, a, color) {
+  r = Math.max(r, 2);
   const b = REDUCED ? .6 : breath(); const c = hex2rgb(color);
   const g = Math.max(6, r * 2.2) * (.75 + .6 * b);
   const grd = ctx.createRadialGradient(x, y, r * .5, x, y, r + g);
@@ -315,7 +326,8 @@ function drawDots(ctx, pg, o = {}) {
     if (i === pg.goal) { ctx.strokeStyle = rgba(accC, a); ctx.lineWidth = Math.max(1.5, r * .28); ctx.beginPath(); ctx.arc(x, y, r - ctx.lineWidth / 2, 0, 7); ctx.stroke(); continue; }
     if (a <= 0) continue;
     ctx.fillStyle = rgba(d.st === 'g' ? pal.gone : pal.left, a);
-    ctx.beginPath(); ctx.arc(x, y, Math.max(.5, r), 0, 7); ctx.fill();
+    if (r < 1.1) ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    else { ctx.beginPath(); ctx.arc(x, y, Math.max(.5, r), 0, 7); ctx.fill(); }
     if (pg.ms.has(i)) ring(ctx, x, y, r, accC, a);
   }
   if (td && !o.noToday) glowDot(ctx, td[0], td[1], td[2], a0, acc);
@@ -469,7 +481,8 @@ function changeUnit(u) {
       const lp = ENT(cl(p * 1.3 - (ib / nB) * .3));
       const x = lerp(da.x, db.x, lp), y = lerp(da.y, db.y, lp), r = lerp(da.r, db.r, lp);
       X.fillStyle = mixc(col(A, ia), col(B, ib), lp);
-      X.beginPath(); X.arc(x, y, Math.max(.5, r), 0, 7); X.fill();
+      if (r < 1.1) X.fillRect(x - r, y - r, r * 2, r * 2);
+      else { X.beginPath(); X.arc(x, y, Math.max(.5, r), 0, 7); X.fill(); }
     }
     const out = SAL(seg(p, 0, .14)), inn = ENT(seg(p, .14, .42));
     const first = p < .14;
@@ -599,7 +612,7 @@ function nearestDot(pg, x, y) {
 function longPress(p) {
   if (!p || p.moved) return; p.long = true;
   const pg = getPage(pages[cur]);
-  if (p.y > ST + 80 && p.y < ST + 192) { openSheet(); return; }
+  if (p.y > ST + 10 && p.y < ST + 192) { openSheet(); return; }
   const i = nearestDot(pg, p.x, p.y); if (i < 0) return;
   hl = { i, t0: performance.now() };
   showBubble(pg, i);

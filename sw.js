@@ -1,4 +1,4 @@
-const CACHE = 'spare-v1.0';
+const CACHE = 'spare-v1.1';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'fonts/InterDisplay-ExtraLight.woff', 'fonts/InterDisplay-Light.woff', 'fonts/Inter-Regular.woff', 'fonts/Inter-SemiBold.woff',
   'img/papel-claro.jpg', 'img/papel-oscuro.jpg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
