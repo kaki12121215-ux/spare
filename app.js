@@ -1,7 +1,7 @@
 /* Spare · versión 1.0 */
 (() => {
 'use strict';
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 /* ---------- utilidades de fecha ---------- */
 const DAY = 86400000;
@@ -111,10 +111,12 @@ function layout(N, cols, top, bottom, ratio, lead = 0, dims) {
   const gw = dims.W - 56, rows = Math.ceil((N + lead) / cols);
   const cell = Math.min(gw / cols, (bottom - top) / rows);
   const s = Math.max(.8, cell * ratio);
-  const xp = cols > 1 ? (gw - s) / (cols - 1) : 0;
+  let xp = cols > 1 ? (gw - s) / (cols - 1) : 0, x0 = 28;
+  // en la imagen del fondo de pantalla los puntos van en cuadrícula exacta y centrados
+  if (dims.square && cols > 1 && xp > cell) { xp = cell; x0 = 28 + (gw - s - (cols - 1) * cell) / 2; }
   const out = [];
-  for (let i = 0; i < N; i++) { const k = i + lead; out.push({ x: 28 + s / 2 + (cols > 1 ? (k % cols) * xp : (gw - s) / 2), y: top + s / 2 + Math.floor(k / cols) * cell, r: s / 2 }); }
-  return { pts: out, xp, cell, s };
+  for (let i = 0; i < N; i++) { const k = i + lead; out.push({ x: x0 + s / 2 + (cols > 1 ? (k % cols) * xp : (gw - s) / 2), y: top + s / 2 + Math.floor(k / cols) * cell, r: s / 2 }); }
+  return { pts: out, xp, cell, s, x0 };
 }
 function autoCols(N, top, bottom, dims) {
   // mismas columnas siempre, sin depender del alto de la pantalla en cada apertura
@@ -302,7 +304,7 @@ function drawHeader(ctx, pg, o = {}, dims) {
   txt(ctx, o.unitText ?? pg.unitText, 28, T + 182 + d2 + (o.numDy || 0) * .6, F(400, 17), a2 * .55 * (o.numA ?? 1));
   let [a3, d3] = blk(3);
   let x = 28; const rects = [];
-  for (const u of pg.units) {
+  for (const u of (o.noUnits ? [] : pg.units)) {
     let on = u === pg.unit ? 1 : 0;
     if (o.unitFrom) on = u === o.unitTo ? o.unitMix : (u === o.unitFrom ? 1 - o.unitMix : 0);
     const f = F(on > .5 ? 600 : 400, 13); ctx.font = f; const w = ctx.measureText(u).width;
@@ -313,7 +315,7 @@ function drawHeader(ctx, pg, o = {}, dims) {
 }
 function drawWD(ctx, pg, a, cam) {
   if (!pg.wd || a <= 0) return; const L = pg.L;
-  pg.wd.forEach((l, i) => { let x = 28 + L.s / 2 + i * L.xp, y = pg.wdY; if (cam) { x = cam.tx + (x - cam.fx) * cam.s; y = cam.ty + (y - cam.fy) * cam.s; } txt(ctx, l, x, y, F(400, 12), a * .4, 'center'); });
+  pg.wd.forEach((l, i) => { let x = L.x0 + L.s / 2 + i * L.xp, y = pg.wdY; if (cam) { x = cam.tx + (x - cam.fx) * cam.s; y = cam.ty + (y - cam.fy) * cam.s; } txt(ctx, l, x, y, F(400, 12), a * .4, 'center'); });
 }
 /* puntos; cam: {s, fx, fy, tx, ty}; reveal: {cx, cy, R, f} */
 function drawDots(ctx, pg, o = {}) {
@@ -827,12 +829,10 @@ function renderHitos() {
 const tex = { light: new Image(), dark: new Image() };
 tex.light.src = 'img/papel-claro.jpg'; tex.dark.src = 'img/papel-oscuro.jpg';
 $('sp-wallpaper').addEventListener('click', () => {
-  const dims = { W: 390, H: 844, ST: 47, SB: 34 }, k = 3;
+  // deja sitio arriba para la hora y abajo para la linterna y la cámara de la pantalla de bloqueo
+  const dims = { W: 390, H: 844, ST: 47 + 150, SB: 34 + 80, square: true }, k = 3;
   const key = pages[cur].startsWith('cd:') ? pages[cur] : (VIEWS.includes(pages[cur]) ? pages[cur] : 'ano');
   const pg = build(key, unitOf(key), new Date(), dims);
-  // el fondo de pantalla deja sitio arriba para la hora del iPhone
-  const shift = 150;
-  pg.dots.forEach(d => d.y += shift);
   const c = document.createElement('canvas'); c.width = 390 * k; c.height = 844 * k;
   const ctx = c.getContext('2d');
   const im = tex[THEME];
@@ -840,7 +840,7 @@ $('sp-wallpaper').addEventListener('click', () => {
   if (im.complete && im.naturalWidth) { ctx.save(); ctx.scale(1.5, 1.5); ctx.fillStyle = ctx.createPattern(im, 'repeat'); ctx.fillRect(0, 0, c.width / 1.5, c.height / 1.5); ctx.restore(); }
   ctx.scale(k, k);
   const keepW = W, keepH = H; W = 390; H = 844;
-  ctx.save(); ctx.translate(0, shift); drawHeader(ctx, pg, {}, { ST: 47 }); drawWD(ctx, pg, 1); drawLegend(ctx, Object.assign({}, pg, { dots: pg.dots.map(d => Object.assign({}, d, { y: d.y - shift })) }), 1); ctx.restore();
+  drawHeader(ctx, pg, { noUnits: true }, { ST: dims.ST }); drawWD(ctx, pg, 1); drawLegend(ctx, pg, 1);
   drawDots(ctx, pg, {});
   W = keepW; H = keepH;
   $('sp-wall-img').src = c.toDataURL('image/png');
