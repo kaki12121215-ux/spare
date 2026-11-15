@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Spare">
+<meta name="theme-color" content="#F7F7F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B0D14" media="(prefers-color-scheme: dark)">
+<title>Spare</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preload" href="fonts/InterDisplay-ExtraLight.woff" as="font" type="font/woff" crossorigin>
+<link rel="preload" href="fonts/Inter-Regular.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="sp-safe" aria-hidden="true"></div>
+  <canvas id="sp-stage"></canvas>
+
+  <!-- Bocadillo al mantener pulsado un punto -->
+  <div id="sp-bubble" class="sp-bubble" hidden>
+    <b id="sp-bubble-t"></b>
+    <small id="sp-bubble-s"></small>
+    <button id="sp-bubble-a" class="sp-bubble-a" type="button"></button>
+  </div>
+
+  <!-- Barra inferior -->
+  <nav id="sp-nav" class="sp-nav"></nav>
+
+  <!-- Aviso -->
+  <div id="sp-toast" class="sp-toast" hidden></div>
+
+  <!-- Primera vez -->
+  <section id="sp-welcome" class="sp-welcome" hidden>
+    <div class="sp-welcome-in">
+      <div class="sp-welcome-dots" aria-hidden="true"></div>
+      <h1 class="sp-welcome-t">spare</h1>
+      <p class="sp-welcome-p">Cada punto es un día que todavía no has vivido.</p>
+      <label class="sp-lbl" for="sp-w-day">¿Cuándo naciste?</label>
+      <div class="sp-welcome-fields">
+        <select id="sp-w-day" class="sp-field"></select>
+        <select id="sp-w-month" class="sp-field sp-field-wide"></select>
+        <select id="sp-w-year" class="sp-field"></select>
+      </div>
+      <p class="sp-note">Se guarda solo en este iPhone.</p>
+    </div>
+    <button id="sp-w-go" class="sp-btn sp-welcome-btn" type="button">Empezar</button>
+  </section>
+
+  <!-- Hojas -->
+  <div id="sp-veil" class="sp-veil" hidden></div>
+  <section id="sp-sheet" class="sp-sheet" hidden>
+    <div class="sp-grab" data-close></div>
+    <div id="sp-pages" class="sp-pages">
+      <!-- Ajustes -->
+      <div class="sp-page" id="sp-p-ajustes">
+        <h2 class="sp-sh-t">Ajustes</h2>
+        <div class="sp-sec">Tú</div>
+        <div class="sp-rw">Fecha de nacimiento<span class="sp-v" id="sp-v-birth"></span><input type="date" class="sp-over" id="sp-i-birth"></div>
+        <div class="sp-rw">Vida hasta los<span class="sp-v" id="sp-v-life"></span><select class="sp-over" id="sp-i-life"></select></div>
+        <div class="sp-sec">Calendario</div>
+        <div class="sp-rw">La semana empieza en<span class="sp-v" id="sp-v-week"></span>
+          <select class="sp-over" id="sp-i-week"><option value="1">Lunes</option><option value="0">Domingo</option></select></div>
+        <div class="sp-rw">Inicio del curso<span class="sp-v" id="sp-v-cs"></span><input type="date" class="sp-over" id="sp-i-cs"></div>
+        <div class="sp-rw">Fin del curso<span class="sp-v" id="sp-v-ce"></span><input type="date" class="sp-over" id="sp-i-ce"></div>
+        <div class="sp-sec">Tus días</div>
+        <button class="sp-rw" type="button" data-go="sp-p-cuentas">Cuentas atrás<span class="sp-v"><span id="sp-v-cd"></span><i class="sp-chev"></i></span></button>
+        <button class="sp-rw" type="button" data-go="sp-p-hitos">Hitos<span class="sp-v"><span id="sp-v-hitos"></span><i class="sp-chev"></i></span></button>
+        <div class="sp-sec">Pantalla</div>
+        <div class="sp-rw">Apariencia
+          <div class="sp-segc" id="sp-i-theme"><button type="button" data-v="auto">Auto</button><button type="button" data-v="light">Clara</button><button type="button" data-v="dark">Oscura</button></div></div>
+        <div class="sp-rw">Al abrir<span class="sp-v" id="sp-v-open"></span>
+          <select class="sp-over" id="sp-i-open"><option value="last">Última vista</option><option value="vida">Vida</option><option value="ano">Año</option><option value="mes">Mes</option><option value="semana">Semana</option><option value="dia">Día</option></select></div>
+        <button class="sp-rw" type="button" id="sp-wallpaper">Fondo de pantalla<span class="sp-v">Crear imagen<i class="sp-chev"></i></span></button>
+        <p class="sp-version">Versión <span id="sp-version"></span></p>
+      </div>
+      <!-- Cuentas atrás -->
+      <div class="sp-page" id="sp-p-cuentas" hidden>
+        <button class="sp-back" type="button" data-back><i class="sp-chev sp-chev-l"></i>Ajustes</button>
+        <h2 class="sp-sh-t">Cuentas atrás</h2>
+        <p class="sp-intro">Las activadas aparecen como un punto de color al final de la barra.</p>
+        <div id="sp-cd-list"></div>
+        <button class="sp-btn sp-btn-bottom" type="button" id="sp-cd-new">Nueva cuenta atrás</button>
+      </div>
+      <!-- Hitos -->
+      <div class="sp-page" id="sp-p-hitos" hidden>
+        <button class="sp-back" type="button" data-back><i class="sp-chev sp-chev-l"></i>Ajustes</button>
+        <h2 class="sp-sh-t">Hitos</h2>
+        <p class="sp-intro">Para marcar un día, mantén pulsado su punto y elige «Marcar como hito».</p>
+        <div id="sp-h-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hoja de cuenta atrás (nueva o editar) -->
+  <section id="sp-form" class="sp-sheet sp-sheet-form" hidden>
+    <div class="sp-grab" data-close-form></div>
+    <h2 class="sp-sh-t" id="sp-f-title">Nueva cuenta atrás</h2>
+    <label class="sp-lbl" for="sp-f-name">Nombre</label>
+    <input id="sp-f-name" class="sp-field sp-field-text" type="text" maxlength="28" placeholder="Verano" autocomplete="off">
+    <label class="sp-lbl" for="sp-f-date">Fecha</label>
+    <div class="sp-field sp-field-date"><span id="sp-f-date-v">Elige una fecha</span><input id="sp-f-date" type="date" class="sp-over"></div>
+    <label class="sp-lbl" for="sp-f-from">Contar desde</label>
+    <div class="sp-field sp-field-date"><span id="sp-f-from-v"></span><input id="sp-f-from" type="date" class="sp-over"></div>
+    <div class="sp-lbl">Color</div>
+    <div class="sp-colors" id="sp-f-colors"></div>
+    <div class="sp-rw sp-rw-plain">Mostrar en la barra<button type="button" class="sp-tog sp-on" id="sp-f-show" aria-label="Mostrar en la barra"></button></div>
+    <button class="sp-btn" type="button" id="sp-f-save">Guardar cuenta atrás</button>
+    <button class="sp-link-danger" type="button" id="sp-f-del" hidden>Borrar cuenta atrás</button>
+  </section>
+
+  <!-- Fondo de pantalla -->
+  <section id="sp-wall" class="sp-wall" hidden>
+    <img id="sp-wall-img" alt="Fondo de pantalla de hoy">
+    <p>Mantén pulsada la imagen y elige «Guardar en Fotos». Después, en Fotos, «Usar como fondo de pantalla».</p>
+    <button class="sp-btn" type="button" id="sp-wall-close">Hecho</button>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
