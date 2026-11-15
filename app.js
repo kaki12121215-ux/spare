@@ -1,7 +1,7 @@
 /* Spare · versión 1.0 */
 (() => {
 'use strict';
-const VERSION = '1.1';
+const VERSION = '1.2';
 
 /* ---------- utilidades de fecha ---------- */
 const DAY = 86400000;
@@ -72,12 +72,20 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const cv = document.getElementById('sp-stage');
 const X = cv.getContext('2d');
 let W = 390, H = 844, DPR = 1, ST = 47, SB = 34;
+const STANDALONE = !!(navigator.standalone || matchMedia('(display-mode: standalone)').matches);
+let lastDims = '';
 function measure() {
   DPR = Math.min(3, window.devicePixelRatio || 1);
-  W = window.innerWidth; H = window.innerHeight;
+  W = window.innerWidth;
+  H = Math.max(window.innerHeight, document.documentElement.clientHeight);
   const cs = getComputedStyle(document.getElementById('sp-safe'));
-  ST = Math.max(parseFloat(cs.paddingTop) || 0, 20); SB = parseFloat(cs.paddingBottom) || 0;
+  ST = parseFloat(cs.paddingTop) || 0; SB = parseFloat(cs.paddingBottom) || 0;
+  // al abrir la app instalada, iOS a veces da los márgenes tarde: se fijan los del iPhone
+  if (STANDALONE && ST < 20) ST = 47;
+  if (STANDALONE && SB < 1 && H > 780) SB = 34;
+  ST = Math.max(ST, 20);
   cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  const d = W + 'x' + H + 'x' + ST + 'x' + SB, changed = d !== lastDims; lastDims = d; return changed;
 }
 
 /* ---------- vistas ---------- */
@@ -109,8 +117,9 @@ function layout(N, cols, top, bottom, ratio, lead = 0, dims) {
   return { pts: out, xp, cell, s };
 }
 function autoCols(N, top, bottom, dims) {
-  let best = 1, bc = 0; const gw = dims.W - 56;
-  for (let c = 1; c <= 400; c++) { const cell = Math.min(gw / c, (bottom - top) / Math.ceil(N / c)); if (cell >= bc - 0.01) { bc = cell; best = c; } }
+  // mismas columnas siempre, sin depender del alto de la pantalla en cada apertura
+  let best = 1, bc = 0; const gw = dims.W - 56, hh = gw * 1.35;
+  for (let c = 1; c <= 400; c++) { const cell = Math.min(gw / c, hh / Math.ceil(N / c)); if (cell >= bc - 0.01) { bc = cell; best = c; } }
   return best;
 }
 
@@ -134,8 +143,7 @@ function build(key, unit, now, dims) {
     if (unit === 'Días') {
       const end = new Date(b.getFullYear() + S.life, b.getMonth(), b.getDate());
       const tot = daysBetween(b, end), lived = cl(daysBetween(b, today), 0, tot);
-      const cols = autoCols(tot, top, bottom, dims);
-      set(tot, lived, cols, .42);
+      set(tot, lived, 183, .42); // una fila por cada medio año
       const left = Math.max(0, tot - lived - 1); pg.num = miles(left); pg.unitText = pl(left, 'día', 'días') + ' por delante';
       pg.dayLevel = true;
       pg.dateOf = i => { const s = addDays(b, i); return { s, e: addDays(s, 1), t: fechaLarga(s) + ' de ' + s.getFullYear(), age: Math.floor(daysBetween(b, s) / 365.25) }; };
@@ -864,11 +872,23 @@ function tick() {
 }
 setInterval(tick, 15000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-window.addEventListener('resize', () => { rebuild(); });
+let pendingResize = false;
+function onResize() {
+  if (anim || drag) { pendingResize = true; return; }
+  pendingResize = false;
+  const keep = lastDims; measure(); const now2 = lastDims; lastDims = keep;
+  if (now2 !== keep) { lastDims = now2; rebuild(); }
+}
+window.addEventListener('resize', onResize);
+setInterval(() => { if (pendingResize && !anim && !drag) onResize(); }, 500);
 
 /* ---------- arranque ---------- */
 async function start() {
-  applyTheme(); measure();
+  applyTheme();
+  // espera a que el tamaño de la pantalla se asiente antes de colocar nada
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  await new Promise(r => setTimeout(r, 80));
+  measure();
   try { await Promise.all([document.fonts.load(FONT_NUM), document.fonts.load(F(400, 15)), document.fonts.load(F(600, 15))]); } catch (e) {}
   pages = pagesList(now);
   const first = S.open === 'last' ? S.last : S.open;
