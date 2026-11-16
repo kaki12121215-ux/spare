@@ -1,7 +1,7 @@
 /* Spare · versión 1.0 */
 (() => {
 'use strict';
-const VERSION = '1.3';
+const VERSION = '1.4';
 
 /* ---------- utilidades de fecha ---------- */
 const DAY = 86400000;
@@ -109,11 +109,19 @@ function getCd(id, now) { return allCds(now).find(c => c.id === id); }
 /* layout: reparte N puntos a todo el ancho */
 function layout(N, cols, top, bottom, ratio, lead = 0, dims) {
   const gw = dims.W - 56, rows = Math.ceil((N + lead) / cols);
-  const cell = Math.min(gw / cols, (bottom - top) / rows);
-  const s = Math.max(.8, cell * ratio);
+  const dpr = dims.dpr || DPR;
+  let cell = Math.min(gw / cols, (bottom - top) / rows);
+  let s = Math.max(.8, cell * ratio);
   let xp = cols > 1 ? (gw - s) / (cols - 1) : 0, x0 = 28;
-  // en la imagen del fondo de pantalla los puntos van en cuadrícula exacta y centrados
-  if (dims.square && cols > 1 && xp > cell) { xp = cell; x0 = 28 + (gw - s - (cols - 1) * cell) / 2; }
+  // puntos pequeños: cuadrícula exacta, ajustada a los píxeles de la pantalla y centrada,
+  // para que la rejilla se vea siempre igual (sin rayas ni dibujos raros)
+  if ((s < 7 || dims.square) && cols > 1) {
+    const pp = Math.max(2, Math.floor(cell * dpr)); cell = pp / dpr;
+    s = Math.max(1, Math.round(pp * ratio)) / dpr;
+    xp = cell;
+    x0 = Math.round((28 + (gw - s - (cols - 1) * cell) / 2) * dpr) / dpr;
+    top = Math.round(top * dpr) / dpr;
+  }
   const out = [];
   for (let i = 0; i < N; i++) { const k = i + lead; out.push({ x: x0 + s / 2 + (cols > 1 ? (k % cols) * xp : (gw - s) / 2), y: top + s / 2 + Math.floor(k / cols) * cell, r: s / 2 }); }
   return { pts: out, xp, cell, s, x0 };
@@ -505,8 +513,8 @@ function changeUnit(u) {
 function intro() {
   const key = pages[cur], pg = getPage(key);
   const td = pg.today >= 0 ? pg.dots[pg.today] : pg.dots[Math.floor(pg.dots.length / 2)];
-  nav.classList.add('sp-hide');
-  if (REDUCED) { nav.classList.remove('sp-hide'); introDone = true; return; }
+  showChrome(false);
+  if (REDUCED) { showChrome(true); introDone = true; return; }
   const total = 3400;
   anim = { t0: performance.now(), dur: total, draw: (p, ms) => {
     const t = ms / 1000;
@@ -524,12 +532,15 @@ function intro() {
     if (!isNaN(raw) && !pg.num.includes(',')) num = miles(Math.round(raw * cnt));
     drawHeader(X, pg, { stag: stg, num });
     drawLegend(X, pg, stg[3]);
-    if (t > 2.9 && nav.classList.contains('sp-hide')) nav.classList.remove('sp-hide');
+    if (t > 2.9 && nav.classList.contains('sp-hide')) showChrome(true);
   }, done: () => { introDone = true; maybeHint(); } };
 }
 
 /* ---------- barra ---------- */
 const nav = document.getElementById('sp-nav');
+const gear = document.getElementById('sp-gear');
+function showChrome(on) { nav.classList.toggle('sp-hide', !on); gear.classList.toggle('sp-hide', !on); }
+gear.addEventListener('click', () => { if (anim && !introDone) return; openSheet(); });
 function renderNav() {
   nav.innerHTML = '';
   pages.forEach((k, i) => {
@@ -680,8 +691,8 @@ function showToast(msg, ms = 3800) {
   requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.remove('sp-enter')));
   clearTimeout(showToast.t); showToast.t = setTimeout(() => { toast.classList.add('sp-enter'); setTimeout(() => toast.hidden = true, 400); }, ms);
 }
-function maybeHint() { if (!S.hintShown) { S.hintShown = true; save(); setTimeout(() => showToast('Mantén pulsada la cifra para abrir los ajustes'), 600); } }
-function skipIntro() { if (anim && !introDone) { anim = null; introDone = true; nav.classList.remove('sp-hide'); maybeHint(); } }
+function maybeHint() { S.hintShown = true; save(); }
+function skipIntro() { if (anim && !introDone) { anim = null; introDone = true; showChrome(true); maybeHint(); } }
 
 /* ---------- hojas ---------- */
 const veil = document.getElementById('sp-veil'), sheet = document.getElementById('sp-sheet'), form = document.getElementById('sp-form');
@@ -830,7 +841,7 @@ const tex = { light: new Image(), dark: new Image() };
 tex.light.src = 'img/papel-claro.jpg'; tex.dark.src = 'img/papel-oscuro.jpg';
 $('sp-wallpaper').addEventListener('click', () => {
   // deja sitio arriba para la hora y abajo para la linterna y la cámara de la pantalla de bloqueo
-  const dims = { W: 390, H: 844, ST: 47 + 150, SB: 34 + 80, square: true }, k = 3;
+  const dims = { W: 390, H: 844, ST: 47 + 150, SB: 34 + 80, square: true, dpr: 3 }, k = 3;
   const key = pages[cur].startsWith('cd:') ? pages[cur] : (VIEWS.includes(pages[cur]) ? pages[cur] : 'ano');
   const pg = build(key, unitOf(key), new Date(), dims);
   const c = document.createElement('canvas'); c.width = 390 * k; c.height = 844 * k;
@@ -895,7 +906,7 @@ async function start() {
   cur = Math.max(0, pages.indexOf(first));
   renderNav();
   requestAnimationFrame(frame);
-  if (!S.birth) { nav.classList.add('sp-hide'); welcome(); }
+  if (!S.birth) { showChrome(false); welcome(); }
   else intro();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 }
